@@ -32,6 +32,7 @@ lxml==4.5.0
 markdown
 pillow
 --no-binary psycopg2
+psycopg2
 pyYAML
 python-dateutil
 python-docx
