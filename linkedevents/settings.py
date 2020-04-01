@@ -62,7 +62,19 @@ env = environ.Env(
     MAIL_MAILGUN_KEY=(str, ''),
     MAIL_MAILGUN_DOMAIN=(str, ''),
     MAIL_MAILGUN_API=(str, ''),
-    LIPPUPISTE_EVENT_API_URL=(str, None)
+    LIPPUPISTE_EVENT_API_URL=(str, None),
+
+    OIDC_AUDIENCE=(str,''),
+    OIDC_SECRET=(str, ''),
+    OIDC_API_SCOPE_PREFIX=(str,''),
+    OIDC_API_AUTHORIZATION_FIELD=(str, ''),
+    OIDC_REQUIRE_API_SCOPE_FOR_AUTHENTICATION=(bool, False),
+    OIDC_ISSUER=(str, ''),
+    OIDC_LEEWAY=(int, 0),
+    HELUSERS_PROVIDER=(str, 'helusers.providers.helsinki'),
+    HELUSERS_SOCIALACCOUNT_ADAPTER=(str, 'helusers.adapter.SocialAccountAdapter'),
+    HELUSERS_DEFAULT_AUTHENTICATION=(str, 'helusers.jwt.JWTAuthentication'),
+    HELUSERS_AUTHENTICATION_BACKEND=(str, 'helusers.tunnistamo_oidc.TunnistamoOIDCAuth'),
 )
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
@@ -127,7 +139,6 @@ INSTALLED_APPS = [
     'helusers',
     'django.contrib.sites',
     'modeltranslation',
-    'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -149,11 +160,12 @@ INSTALLED_APPS = [
     'notifications',
     'anymail',
 
+    'social_django',
     'allauth',
     'allauth.account',
     'allauth.socialaccount',
     'helusers.providers.helsinki',
-
+    'linkedevents.providers.turku_oidc',
     'helevents',
     'munigeo',
     'leaflet',
@@ -166,6 +178,15 @@ if env('SENTRY_DSN'):
         environment=env('SENTRY_ENVIRONMENT'),
         release=get_git_revision_hash(),
         integrations=[DjangoIntegration()]
+    )
+
+if env('HELUSERS_PROVIDER') == 'linkedevents.providers.turku_oidc':
+    INSTALLED_APPS.append(
+        'linkedevents.providers.turku_oidc.admin_site.AdminConfig'
+    )
+else:
+    INSTALLED_APPS.append(
+        'helusers.apps.HelusersAdminConfig'
     )
 
 MIDDLEWARE = [
@@ -230,16 +251,22 @@ USE_X_FORWARDED_HOST = env('TRUST_X_FORWARDED_HOST')
 AUTH_USER_MODEL = 'helevents.User'
 AUTHENTICATION_BACKENDS = (
     'django.contrib.auth.backends.ModelBackend',
+    env('HELUSERS_AUTHENTICATION_BACKEND'),
     'allauth.account.auth_backends.AuthenticationBackend',
 )
 SOCIALACCOUNT_PROVIDERS = {
     'helsinki': {
         'VERIFIED_EMAIL': True
-    }
+    },
+    'turku_oidc': {
+        'VERIFIED_EMAIL': True
+    },
 }
 LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/'
 ACCOUNT_LOGOUT_ON_GET = True
-SOCIALACCOUNT_ADAPTER = 'helusers.adapter.SocialAccountAdapter'
+SOCIALACCOUNT_ADAPTER = env('HELUSERS_SOCIALACCOUNT_ADAPTER')
+HELUSERS_PROVIDER = env('HELUSERS_PROVIDER')
 
 #
 # REST Framework
@@ -266,16 +293,31 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticatedOrReadOnly',
     ),
     'DEFAULT_AUTHENTICATION_CLASSES': (
+        env('HELUSERS_DEFAULT_AUTHENTICATION'),
         'events.auth.ApiKeyAuthentication',
         'helusers.jwt.JWTAuthentication',
     ),
     'DEFAULT_VERSIONING_CLASS': 'rest_framework.versioning.URLPathVersioning',
     'VIEW_NAME_FUNCTION': 'events.api.get_view_name',
 }
+
+OIDC_API_TOKEN_AUTH = {
+    'AUDIENCE': env('OIDC_AUDIENCE'),
+    'API_SCOPE_PREFIX': env('OIDC_API_SCOPE_PREFIX'),
+    'API_AUTHORIZATION_FIELD': env('OIDC_API_AUTHORIZATION_FIELD'),
+    'REQUIRE_API_SCOPE_FOR_AUTHENTICATION': env('OIDC_REQUIRE_API_SCOPE_FOR_AUTHENTICATION'),
+    'ISSUER': env('OIDC_ISSUER'),
+    'OIDC_SECRET': env('OIDC_SECRET')
+}
+
+OIDC_AUTH = {
+    'OIDC_LEEWAY': env('OIDC_LEEWAY')
+}
+
 JWT_AUTH = {
     'JWT_PAYLOAD_GET_USER_ID_HANDLER': 'helusers.jwt.get_user_id_from_payload_handler',
     'JWT_AUDIENCE': env('TOKEN_AUTH_ACCEPTED_AUDIENCE'),
-    'JWT_SECRET_KEY': env('TOKEN_AUTH_SHARED_SECRET'),
+    'JWT_SECRET_KEY': 'SECREKTYEASURAKSFG', #env('TOKEN_AUTH_SHARED_SECRET'),
 }
 
 CORS_ORIGIN_ALLOW_ALL = True
@@ -311,6 +353,7 @@ TEMPLATES = [
                 'django.template.context_processors.media',
                 'django.template.context_processors.static',
                 'django.template.context_processors.tz',
+                'helusers.context_processors.settings',
                 'django.contrib.messages.context_processors.messages',
             ],
         },
