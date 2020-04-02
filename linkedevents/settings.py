@@ -73,7 +73,6 @@ env = environ.Env(
     OIDC_LEEWAY=(int, 0),
     HELUSERS_PROVIDER=(str, 'helusers.providers.helsinki'),
     HELUSERS_SOCIALACCOUNT_ADAPTER=(str, 'helusers.adapter.SocialAccountAdapter'),
-    HELUSERS_DEFAULT_AUTHENTICATION=(str, 'helusers.jwt.JWTAuthentication'),
     HELUSERS_AUTHENTICATION_BACKEND=(str, 'helusers.tunnistamo_oidc.TunnistamoOIDCAuth'),
 )
 
@@ -293,7 +292,7 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticatedOrReadOnly',
     ),
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        env('HELUSERS_DEFAULT_AUTHENTICATION'),
+        'linkedevents.providers.turku_oidc.oidc.ApiTokenAuthentication',
         'events.auth.ApiKeyAuthentication',
         'helusers.jwt.JWTAuthentication',
     ),
@@ -317,7 +316,7 @@ OIDC_AUTH = {
 JWT_AUTH = {
     'JWT_PAYLOAD_GET_USER_ID_HANDLER': 'helusers.jwt.get_user_id_from_payload_handler',
     'JWT_AUDIENCE': env('TOKEN_AUTH_ACCEPTED_AUDIENCE'),
-    'JWT_SECRET_KEY': 'SECREKTYEASURAKSFG', #env('TOKEN_AUTH_SHARED_SECRET'),
+    'JWT_SECRET_KEY': env('TOKEN_AUTH_SHARED_SECRET'),
 }
 
 CORS_ORIGIN_ALLOW_ALL = True
